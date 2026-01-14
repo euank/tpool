@@ -350,7 +350,7 @@ func main() {
 
 	// Start web server if enabled
 	if cfg.Web != nil && cfg.Web.Enabled {
-		webServer := web.NewServer(cfg.Socket, cfg.Web.Address)
+		webServer := web.NewServer(cfg.Socket, cfg.Web.Address, cfg.Web.Ngrok)
 		go func() {
 			if err := webServer.Start(); err != nil {
 				log.Printf("Web server error: %v", err)

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -10,8 +11,11 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/esk/tpool/internal/config"
 	"github.com/esk/tpool/internal/protocol"
 	"github.com/gorilla/websocket"
+	"golang.ngrok.com/ngrok"
+	ngrokconfig "golang.ngrok.com/ngrok/config"
 )
 
 //go:embed static/*
@@ -53,15 +57,17 @@ func (c *DaemonClient) Close() {
 }
 
 type Server struct {
-	sockPath string
-	addr     string
-	mux      *http.ServeMux
+	sockPath   string
+	addr       string
+	ngrokCfg   *config.NgrokConfig
+	mux        *http.ServeMux
 }
 
-func NewServer(sockPath, addr string) *Server {
+func NewServer(sockPath, addr string, ngrokCfg *config.NgrokConfig) *Server {
 	s := &Server{
 		sockPath: sockPath,
 		addr:     addr,
+		ngrokCfg: ngrokCfg,
 		mux:      http.NewServeMux(),
 	}
 
@@ -76,8 +82,98 @@ func NewServer(sockPath, addr string) *Server {
 }
 
 func (s *Server) Start() error {
+	if s.ngrokCfg != nil {
+		return s.startWithNgrok()
+	}
+	
 	log.Printf("Web server listening on http://%s", s.addr)
 	return http.ListenAndServe(s.addr, s.mux)
+}
+
+func (s *Server) startWithNgrok() error {
+	ctx := context.Background()
+	
+	opts := []ngrokconfig.HTTPEndpointOption{}
+	
+	if s.ngrokCfg.URL != "" {
+		opts = append(opts, ngrokconfig.WithURL(s.ngrokCfg.URL))
+	}
+	
+	if s.ngrokCfg.OAuth != nil {
+		policy := s.buildTrafficPolicy()
+		opts = append(opts, ngrokconfig.WithTrafficPolicy(policy))
+	}
+	
+	listener, err := ngrok.Listen(ctx, ngrokconfig.HTTPEndpoint(opts...))
+	if err != nil {
+		return fmt.Errorf("ngrok listen: %w", err)
+	}
+	
+	log.Printf("Web server listening on %s", listener.URL())
+	
+	return http.Serve(listener, s.mux)
+}
+
+func (s *Server) buildTrafficPolicy() string {
+	if s.ngrokCfg.OAuth == nil {
+		return ""
+	}
+	
+	provider := s.ngrokCfg.OAuth.Provider
+	if provider == "" {
+		provider = "github"
+	}
+	
+	// Build the base OAuth policy
+	policy := fmt.Sprintf(`{
+  "on_http_request": [
+    {
+      "actions": [
+        {
+          "type": "oauth",
+          "config": {
+            "provider": %q
+          }
+        }
+      ]
+    }`, provider)
+	
+	// Add user restriction if allowed_users is specified
+	if len(s.ngrokCfg.OAuth.AllowedUsers) > 0 {
+		// Build the CEL expression for allowed users
+		// For GitHub: actions.ngrok.oauth.identity.name
+		// For Google: actions.ngrok.oauth.identity.email
+		identityField := "actions.ngrok.oauth.identity.email"
+		if provider == "github" {
+			identityField = "actions.ngrok.oauth.identity.name"
+		}
+		
+		// Build list of allowed users as CEL list
+		usersJSON, _ := json.Marshal(s.ngrokCfg.OAuth.AllowedUsers)
+		
+		policy += fmt.Sprintf(`,
+    {
+      "expressions": ["!(%s in %s)"],
+      "actions": [
+        {
+          "type": "custom-response",
+          "config": {
+            "status_code": 403,
+            "content": "Access denied. Your account is not authorized.",
+            "headers": {
+              "content-type": "text/plain"
+            }
+          }
+        }
+      ]
+    }`, identityField, string(usersJSON))
+	}
+	
+	policy += `
+  ]
+}`
+	
+	return policy
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {

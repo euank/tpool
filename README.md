@@ -103,6 +103,14 @@ socket = "/tmp/tpool.sock"
 [web]
 enabled = true
 address = ":8080"
+
+# Expose via ngrok with OAuth (optional)
+[web.ngrok]
+url = "https://your-domain.ngrok.app"
+
+[web.ngrok.oauth]
+provider = "github"  # or "google"
+allowed_users = ["your-username"]
 ```
 
 ### Environment Variables

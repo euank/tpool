@@ -14,8 +14,19 @@ type Config struct {
 }
 
 type WebConfig struct {
-	Enabled bool   `toml:"enabled"`
-	Address string `toml:"address"`
+	Enabled bool         `toml:"enabled"`
+	Address string       `toml:"address"`
+	Ngrok   *NgrokConfig `toml:"ngrok"`
+}
+
+type NgrokConfig struct {
+	URL   string       `toml:"url"`
+	OAuth *OAuthConfig `toml:"oauth"`
+}
+
+type OAuthConfig struct {
+	Provider     string   `toml:"provider"`
+	AllowedUsers []string `toml:"allowed_users"`
 }
 
 func DefaultConfig() *Config {

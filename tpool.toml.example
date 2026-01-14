@@ -7,3 +7,15 @@
 [web]
 enabled = true
 address = ":8080"
+
+# Ngrok configuration (optional)
+# When configured, the web interface will be exposed via ngrok
+# instead of listening on the local address.
+# [web.ngrok]
+# url = "https://your-domain.ngrok.app"  # Your ngrok domain or leave empty for random URL
+#
+# # OAuth configuration (optional)
+# # Restricts access to authenticated users only
+# [web.ngrok.oauth]
+# provider = "github"  # Options: "github", "google", "gitlab", "microsoft", "linkedin", "twitch"
+# allowed_users = ["username1", "username2"]  # GitHub usernames or Google emails
