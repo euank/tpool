@@ -1,0 +1,17 @@
+[Unit]
+Description=tpool terminal multiplexer daemon
+Documentation=https://github.com/esk/tpool
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/tpoold
+# Uncomment and adjust to use a config file:
+# ExecStart=%h/.local/bin/tpoold --config %h/.config/tpool/tpool.toml
+Restart=on-failure
+RestartSec=5
+
+# Environment
+Environment=TERM=xterm-256color
+
+[Install]
+WantedBy=default.target
