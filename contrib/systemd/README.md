@@ -28,24 +28,7 @@ cp tpool.toml.example ~/.config/tpool/tpool.toml
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable tpoold
-systemctl --user start tpoold
-```
-
-## Usage
-
-```bash
-# Check status
-systemctl --user status tpoold
-
-# View logs
-journalctl --user -u tpoold -f
-
-# Restart
-systemctl --user restart tpoold
-
-# Stop
-systemctl --user stop tpoold
+systemctl --user enable --now tpoold
 ```
 
 ## Auto-start on Login

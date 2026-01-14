@@ -1,13 +1,8 @@
 # tpool - Terminal Pool
 
-A modern terminal multiplexer with TUI and web interfaces.
+A terminal multiplexer with a web interface. Think tmux, but accessible via web browser.
 
-## Features
-
-- **Multi-client**: Multiple clients can attach to the same session simultaneously
-- **Persistent sessions**: Sessions continue running after disconnect
-- **TUI-first**: Launch `tpool` for an interactive session manager
-- **Web interface**: Browser-based terminal access with xterm.js
+Beware that this is a vibe-coded project. The code has been reviewed by a real human too.
 
 ## Building
 
@@ -25,7 +20,7 @@ Binaries will be in `bin/`.
 tpoold
 ```
 
-Or just run `tpool` - it will auto-start the daemon.
+Or use the included [systemd unit file](./contrib/systemd/README.md).
 
 ### Launch the TUI
 
@@ -51,17 +46,6 @@ tpoold --config tpool.toml
 
 Then open http://localhost:8080 in your browser.
 
-### TUI Controls
-
-| Key | Action |
-|-----|--------|
-| `↑`/`↓` or `j`/`k` | Navigate sessions |
-| `Enter` | Attach to session |
-| `c` or `n` | Create new session |
-| `d` or `x` | Delete session |
-| `r` | Refresh list |
-| `q` | Quit |
-
 ### While Attached (TUI)
 
 - `Ctrl+B D` - Detach from session (return to TUI)
@@ -69,27 +53,6 @@ Then open http://localhost:8080 in your browser.
 ### While Attached (Web)
 
 - Click "Detach" button in the top bar
-
-## Architecture
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  TUI Client │     │  Web Client │     │  TUI Client │
-└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
-       │                   │                   │
-       │ Unix Socket       │ WebSocket         │
-       └───────────┬───────┴───────────────────┘
-                   │
-           ┌───────┴───────┐
-           │    tpoold     │  (long-lived daemon)
-           └───────┬───────┘
-                   │
-      ┌────────────┼────────────┐
-      │            │            │
-   ┌──┴──┐     ┌──┴──┐     ┌──┴──┐
-   │ PTY │     │ PTY │     │ PTY │
-   └─────┘     └─────┘     └─────┘
-```
 
 ## Configuration
 

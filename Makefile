@@ -3,18 +3,6 @@
 all: build
 
 build:
+	mkdir -p bin
 	go build -o bin/tpoold ./cmd/tpoold
 	go build -o bin/tpool ./cmd/tpool
-
-install: build
-	cp bin/tpoold ~/.local/bin/
-	cp bin/tpool ~/.local/bin/
-
-clean:
-	rm -rf bin/
-
-run-daemon:
-	go run ./cmd/tpoold
-
-run-client:
-	go run ./cmd/tpool
