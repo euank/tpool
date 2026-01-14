@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tpool - Terminal Pool</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="top-bar">
+            <div class="logo">🖥 tpool</div>
+            <div class="session-info" id="session-info"></div>
+            <div class="actions">
+                <button id="btn-detach" class="btn" style="display: none;">Detach</button>
+                <button id="btn-new" class="btn btn-primary">New Session</button>
+            </div>
+        </div>
+
+        <div id="session-list" class="panel">
+            <h2>Sessions</h2>
+            <div id="sessions"></div>
+            <div class="empty-state" id="empty-state">
+                No sessions. Click "New Session" to create one.
+            </div>
+        </div>
+
+        <div id="terminal-container" style="display: none;">
+            <div id="terminal"></div>
+        </div>
+
+        <div id="create-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Create New Session</h3>
+                <input type="text" id="session-name" placeholder="Session name (optional)">
+                <div class="modal-actions">
+                    <button id="btn-cancel" class="btn">Cancel</button>
+                    <button id="btn-create" class="btn btn-primary">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

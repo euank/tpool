@@ -1,0 +1,9 @@
+# tpool configuration file
+
+# Socket path (optional, defaults to $XDG_RUNTIME_DIR/tpool-$UID.sock)
+# socket = "/tmp/tpool.sock"
+
+# Web interface configuration (disabled by default)
+[web]
+enabled = true
+address = ":8080"
