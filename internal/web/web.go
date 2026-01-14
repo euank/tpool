@@ -112,6 +112,20 @@ func (s *Server) startWithNgrok(ctx context.Context) error {
 	return http.Serve(listener, s.mux)
 }
 
+type trafficPolicy struct {
+	OnHTTPRequest []policyRule `json:"on_http_request"`
+}
+
+type policyRule struct {
+	Expressions []string       `json:"expressions,omitempty"`
+	Actions     []policyAction `json:"actions"`
+}
+
+type policyAction struct {
+	Type   string         `json:"type"`
+	Config map[string]any `json:"config,omitempty"`
+}
+
 func (s *Server) buildTrafficPolicy() string {
 	if s.ngrokCfg.OAuth == nil {
 		return ""
@@ -122,56 +136,43 @@ func (s *Server) buildTrafficPolicy() string {
 		provider = "github"
 	}
 
-	// Build the base OAuth policy
-	policy := fmt.Sprintf(`{
-  "on_http_request": [
-    {
-      "actions": [
-        {
-          "type": "oauth",
-          "config": {
-            "provider": %q
-          }
-        }
-      ]
-    }`, provider)
-
-	// Add user restriction if allowed_users is specified
-	if len(s.ngrokCfg.OAuth.AllowedUsers) > 0 {
-		// Build the CEL expression for allowed users
-		// For GitHub: actions.ngrok.oauth.identity.name
-		// For Google: actions.ngrok.oauth.identity.email
-		identityField := "actions.ngrok.oauth.identity.email"
-		if provider == "github" {
-			identityField = "actions.ngrok.oauth.identity.name"
-		}
-
-		// Build list of allowed users as CEL list
-		usersJSON, _ := json.Marshal(s.ngrokCfg.OAuth.AllowedUsers)
-
-		policy += fmt.Sprintf(`,
-    {
-      "expressions": ["!(%s in %s)"],
-      "actions": [
-        {
-          "type": "custom-response",
-          "config": {
-            "status_code": 403,
-            "content": "Access denied. Your account is not authorized.",
-            "headers": {
-              "content-type": "text/plain"
-            }
-          }
-        }
-      ]
-    }`, identityField, string(usersJSON))
+	policy := trafficPolicy{
+		OnHTTPRequest: []policyRule{
+			{
+				Actions: []policyAction{
+					{
+						Type:   "oauth",
+						Config: map[string]any{"provider": provider},
+					},
+				},
+			},
+		},
 	}
 
-	policy += `
-  ]
-}`
+	if len(s.ngrokCfg.OAuth.AllowedUsers) > 0 {
+		// Use email for all providers - it's the most reliable identifier
+		identityField := "actions.ngrok.oauth.identity.email"
 
-	return policy
+		usersJSON, _ := json.Marshal(s.ngrokCfg.OAuth.AllowedUsers)
+		celExpr := fmt.Sprintf("!(%s in %s)", identityField, string(usersJSON))
+
+		policy.OnHTTPRequest = append(policy.OnHTTPRequest, policyRule{
+			Expressions: []string{celExpr},
+			Actions: []policyAction{
+				{
+					Type: "custom-response",
+					Config: map[string]any{
+						"status_code": 403,
+						"content":     "Access denied. Your account (${" + identityField + "}) is not authorized.",
+						"headers":     map[string]string{"content-type": "text/plain"},
+					},
+				},
+			},
+		})
+	}
+
+	data, _ := json.Marshal(policy)
+	return string(data)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
