@@ -5,7 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -86,7 +86,7 @@ func (s *Server) Start() error {
 		return s.startWithNgrok()
 	}
 	
-	log.Printf("Web server listening on http://%s", s.addr)
+	slog.Info("Web server listening", "url", "http://"+s.addr)
 	return http.ListenAndServe(s.addr, s.mux)
 }
 
@@ -109,7 +109,7 @@ func (s *Server) startWithNgrok() error {
 		return fmt.Errorf("ngrok listen: %w", err)
 	}
 	
-	log.Printf("Web server listening on %s", listener.URL())
+	slog.Info("Web server listening", "url", listener.URL())
 	
 	return http.Serve(listener, s.mux)
 }
@@ -338,7 +338,7 @@ func (s *Server) handleTerminalWS(w http.ResponseWriter, r *http.Request) {
 
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Printf("WebSocket upgrade error: %v", err)
+		slog.Error("WebSocket upgrade error", "error", err)
 		return
 	}
 	defer ws.Close()

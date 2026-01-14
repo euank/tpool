@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"os/signal"
@@ -45,7 +45,7 @@ func (s *Server) Start() error {
 		return fmt.Errorf("chmod socket: %w", err)
 	}
 
-	log.Printf("Daemon listening on %s", s.sockPath)
+	slog.Info("Daemon listening", "socket", s.sockPath)
 
 	for {
 		conn, err := listener.Accept()
@@ -60,8 +60,8 @@ func (s *Server) handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	clientID := uuid.New().String()[:8]
-	log.Printf("Client %s connected", clientID)
-	defer log.Printf("Client %s disconnected", clientID)
+	slog.Info("Client connected", "client", clientID)
+	defer slog.Info("Client disconnected", "client", clientID)
 
 	client := &clientHandler{
 		server:   s,
@@ -119,7 +119,7 @@ func (c *clientHandler) handle() {
 		}
 
 		if err := c.processMessage(msg); err != nil {
-			log.Printf("Client %s error: %v", c.clientID, err)
+			slog.Error("Client error", "client", c.clientID, "error", err)
 			c.sendError(err.Error())
 		}
 	}
@@ -194,7 +194,7 @@ func (c *clientHandler) handleCreateSession(msg *protocol.Message) error {
 		return err
 	}
 
-	log.Printf("Session %s (%s) created", sess.ID, sess.Name)
+	slog.Info("Session created", "id", sess.ID, "name", sess.Name)
 
 	info := protocol.SessionInfo{
 		ID:      sess.ID,
@@ -223,7 +223,7 @@ func (c *clientHandler) handleDeleteSession(msg *protocol.Message) error {
 		return err
 	}
 
-	log.Printf("Session %s deleted", payload.SessionID)
+	slog.Info("Session deleted", "id", payload.SessionID)
 	return c.sendOK()
 }
 
@@ -255,7 +255,7 @@ func (c *clientHandler) handleAttach(msg *protocol.Message) error {
 		sess.Resize(payload.Cols, payload.Rows)
 	}
 
-	log.Printf("Client %s attached to session %s", c.clientID, sess.ID)
+	slog.Info("Client attached", "client", c.clientID, "session", sess.ID)
 	return c.sendOK()
 }
 
@@ -271,7 +271,7 @@ func (c *clientHandler) handleDetach() error {
 	if c.outputBuf != nil {
 		c.outputBuf.Close()
 	}
-	log.Printf("Client %s detached from session %s", c.clientID, c.attached.ID)
+	slog.Info("Client detached", "client", c.clientID, "session", c.attached.ID)
 	c.attached = nil
 	c.outputBuf = nil
 
@@ -333,7 +333,8 @@ func main() {
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("Failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	server := NewServer(cfg.Socket)
@@ -343,7 +344,7 @@ func main() {
 
 	go func() {
 		<-sigCh
-		log.Println("Shutting down...")
+		slog.Info("Shutting down")
 		os.Remove(cfg.Socket)
 		os.Exit(0)
 	}()
@@ -353,12 +354,13 @@ func main() {
 		webServer := web.NewServer(cfg.Socket, cfg.Web.Address, cfg.Web.Ngrok)
 		go func() {
 			if err := webServer.Start(); err != nil {
-				log.Printf("Web server error: %v", err)
+				slog.Error("Web server error", "error", err)
 			}
 		}()
 	}
 
 	if err := server.Start(); err != nil {
-		log.Fatalf("Server error: %v", err)
+		slog.Error("Server error", "error", err)
+		os.Exit(1)
 	}
 }
