@@ -35,7 +35,7 @@ func NewServer(sockPath string) *Server {
 	}
 }
 
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
 	os.Remove(s.sockPath)
 
 	listener, err := net.Listen("unix", s.sockPath)
@@ -49,6 +49,11 @@ func (s *Server) Start() error {
 	}
 
 	slog.Info("Daemon listening", "socket", s.sockPath)
+
+	go func() {
+		<-ctx.Done()
+		listener.Close()
+	}()
 
 	for {
 		conn, err := listener.Accept()
@@ -341,6 +346,12 @@ func (c *clientHandler) sendError(errMsg string) error {
 }
 
 func main() {
+	if err := main_(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func main_() error {
 	configPath := flag.String("config", "", "Path to TOML configuration file")
 	flag.Parse()
 
@@ -351,6 +362,7 @@ func main() {
 	}
 
 	server := NewServer(cfg.Socket)
+	defer os.Remove(cfg.Socket)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	g, ctx := errgroup.WithContext(ctx)
@@ -373,17 +385,19 @@ func main() {
 	if cfg.Web != nil && cfg.Web.Enabled {
 		webServer := web.NewServer(cfg.Socket, cfg.Web.Address, cfg.Web.Ngrok)
 		g.Go(func() error {
-			return webServer.Start()
+			if err := webServer.Start(ctx); err != nil {
+				slog.Error("server error", "err", err)
+			}
+			return nil
 		})
 	}
 
 	g.Go(func() error {
-		return server.Start()
+		if err := server.Start(ctx); err != nil {
+			slog.Error("server error", "err", err)
+		}
+		return nil
 	})
 
-	if err := g.Wait(); err != nil {
-		slog.Error("Server error", "error", err)
-	}
-
-	os.Remove(cfg.Socket)
+	return g.Wait()
 }

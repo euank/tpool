@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/esk/tpool/internal/protocol"
 	"golang.org/x/term"
@@ -175,16 +174,16 @@ const (
 )
 
 type model struct {
-	client       *Client
-	sessions     []protocol.SessionInfo
-	cursor       int
-	view         viewState
-	createName   string
-	width        int
-	height       int
-	err          error
-	quitting     bool
-	attachToID   string
+	client     *Client
+	sessions   []protocol.SessionInfo
+	cursor     int
+	view       viewState
+	createName string
+	width      int
+	height     int
+	err        error
+	quitting   bool
+	attachToID string
 }
 
 type sessionsUpdated struct {
@@ -504,7 +503,7 @@ func runAttachedSession(client *Client, sessionID string) error {
 		}
 
 		data := buf[:n]
-		
+
 		// Check for Ctrl+B D detach sequence
 		for i := 0; i < len(data); i++ {
 			if ctrlB {
@@ -550,20 +549,7 @@ func ensureDaemon(sockPath string) error {
 		conn.Close()
 		return nil
 	}
-
-	cmd := exec.Command("tpoold")
-	cmd.Start()
-
-	for i := 0; i < 50; i++ {
-		time.Sleep(100 * time.Millisecond)
-		conn, err := net.Dial("unix", sockPath)
-		if err == nil {
-			conn.Close()
-			return nil
-		}
-	}
-
-	return fmt.Errorf("daemon failed to start")
+	return fmt.Errorf("daemon not running")
 }
 
 func runTUI(sockPath string) (attachTo string, err error) {
@@ -592,7 +578,7 @@ func main() {
 
 	if err := ensureDaemon(sockPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Please start the daemon manually: tpoold\n")
+		fmt.Fprintf(os.Stderr, "Please start the daemon: tpoold\n")
 		os.Exit(1)
 	}
 

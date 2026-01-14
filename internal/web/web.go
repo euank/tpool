@@ -14,8 +14,7 @@ import (
 	"github.com/esk/tpool/internal/config"
 	"github.com/esk/tpool/internal/protocol"
 	"github.com/gorilla/websocket"
-	"golang.ngrok.com/ngrok"
-	ngrokconfig "golang.ngrok.com/ngrok/config"
+	"golang.ngrok.com/ngrok/v2"
 )
 
 //go:embed static/*
@@ -57,10 +56,10 @@ func (c *DaemonClient) Close() {
 }
 
 type Server struct {
-	sockPath   string
-	addr       string
-	ngrokCfg   *config.NgrokConfig
-	mux        *http.ServeMux
+	sockPath string
+	addr     string
+	ngrokCfg *config.NgrokConfig
+	mux      *http.ServeMux
 }
 
 func NewServer(sockPath, addr string, ngrokCfg *config.NgrokConfig) *Server {
@@ -81,36 +80,35 @@ func NewServer(sockPath, addr string, ngrokCfg *config.NgrokConfig) *Server {
 	return s
 }
 
-func (s *Server) Start() error {
+func (s *Server) Start(ctx context.Context) error {
 	if s.ngrokCfg != nil {
-		return s.startWithNgrok()
+		return s.startWithNgrok(ctx)
 	}
-	
+
 	slog.Info("Web server listening", "url", "http://"+s.addr)
 	return http.ListenAndServe(s.addr, s.mux)
 }
 
-func (s *Server) startWithNgrok() error {
-	ctx := context.Background()
-	
-	opts := []ngrokconfig.HTTPEndpointOption{}
-	
+func (s *Server) startWithNgrok(ctx context.Context) error {
+	opts := []ngrok.EndpointOption{}
+
 	if s.ngrokCfg.URL != "" {
-		opts = append(opts, ngrokconfig.WithURL(s.ngrokCfg.URL))
+		opts = append(opts, ngrok.WithURL(s.ngrokCfg.URL))
 	}
-	
+
 	if s.ngrokCfg.OAuth != nil {
 		policy := s.buildTrafficPolicy()
-		opts = append(opts, ngrokconfig.WithTrafficPolicy(policy))
+		slog.Debug("constructed ngrok policy", "policy", policy)
+		opts = append(opts, ngrok.WithTrafficPolicy(policy))
 	}
-	
-	listener, err := ngrok.Listen(ctx, ngrokconfig.HTTPEndpoint(opts...))
+
+	listener, err := ngrok.Listen(ctx, opts...)
 	if err != nil {
 		return fmt.Errorf("ngrok listen: %w", err)
 	}
-	
+
 	slog.Info("Web server listening", "url", listener.URL())
-	
+
 	return http.Serve(listener, s.mux)
 }
 
@@ -118,12 +116,12 @@ func (s *Server) buildTrafficPolicy() string {
 	if s.ngrokCfg.OAuth == nil {
 		return ""
 	}
-	
+
 	provider := s.ngrokCfg.OAuth.Provider
 	if provider == "" {
 		provider = "github"
 	}
-	
+
 	// Build the base OAuth policy
 	policy := fmt.Sprintf(`{
   "on_http_request": [
@@ -137,7 +135,7 @@ func (s *Server) buildTrafficPolicy() string {
         }
       ]
     }`, provider)
-	
+
 	// Add user restriction if allowed_users is specified
 	if len(s.ngrokCfg.OAuth.AllowedUsers) > 0 {
 		// Build the CEL expression for allowed users
@@ -147,10 +145,10 @@ func (s *Server) buildTrafficPolicy() string {
 		if provider == "github" {
 			identityField = "actions.ngrok.oauth.identity.name"
 		}
-		
+
 		// Build list of allowed users as CEL list
 		usersJSON, _ := json.Marshal(s.ngrokCfg.OAuth.AllowedUsers)
-		
+
 		policy += fmt.Sprintf(`,
     {
       "expressions": ["!(%s in %s)"],
@@ -168,11 +166,11 @@ func (s *Server) buildTrafficPolicy() string {
       ]
     }`, identityField, string(usersJSON))
 	}
-	
+
 	policy += `
   ]
 }`
-	
+
 	return policy
 }
 
