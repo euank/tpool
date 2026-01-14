@@ -17,5 +17,5 @@ address = ":8080"
 # # OAuth configuration (optional)
 # # Restricts access to authenticated users only
 # [web.ngrok.oauth]
-# provider = "github"  # Options: "github", "google", "gitlab", "microsoft", "linkedin", "twitch"
+# provider = "github"  # Options: "github", "google"
 # allowed_users = ["username1", "username2"]  # GitHub usernames or Google emails

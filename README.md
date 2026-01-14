@@ -109,8 +109,8 @@ address = ":8080"
 url = "https://your-domain.ngrok.app"
 
 [web.ngrok.oauth]
-provider = "github"  # or "google"
-allowed_users = ["your-username"]
+provider = "github"  # "github" or "google"
+allowed_users = ["your-username"]  # GitHub usernames or Google emails
 ```
 
 ### Environment Variables
