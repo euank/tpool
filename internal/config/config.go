@@ -2,15 +2,18 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
 
 type Config struct {
-	Socket string     `toml:"socket"`
-	Web    *WebConfig `toml:"web"`
+	Socket   string     `toml:"socket"`
+	LogLevel string     `toml:"log_level"`
+	Web      *WebConfig `toml:"web"`
 }
 
 type WebConfig struct {
@@ -31,8 +34,9 @@ type OAuthConfig struct {
 
 func DefaultConfig() *Config {
 	return &Config{
-		Socket: defaultSocketPath(),
-		Web:    nil,
+		Socket:   defaultSocketPath(),
+		LogLevel: "info",
+		Web:      nil,
 	}
 }
 
@@ -68,5 +72,25 @@ func Load(path string) (*Config, error) {
 		cfg.Web.Address = ":8080"
 	}
 
+	// Normalize log level
+	if cfg.LogLevel == "" {
+		cfg.LogLevel = "info"
+	}
+
 	return cfg, nil
+}
+
+func (c *Config) SlogLevel() slog.Level {
+	switch strings.ToLower(c.LogLevel) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

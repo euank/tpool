@@ -3,6 +3,9 @@
 # Socket path (optional, defaults to $XDG_RUNTIME_DIR/tpool-$UID.sock)
 # socket = "/tmp/tpool.sock"
 
+# Log level: debug, info, warn, error (default: info)
+# log_level = "info"
+
 # Web interface configuration (disabled by default)
 [web]
 enabled = true

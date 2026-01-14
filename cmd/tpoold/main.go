@@ -361,6 +361,10 @@ func main_() error {
 		os.Exit(1)
 	}
 
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level: cfg.SlogLevel(),
+	})))
+
 	server := NewServer(cfg.Socket)
 	defer os.Remove(cfg.Socket)
 
