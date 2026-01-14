@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -17,6 +19,7 @@ import (
 	"github.com/esk/tpool/internal/session"
 	"github.com/esk/tpool/internal/web"
 	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 )
 
 type Server struct {
@@ -50,10 +53,20 @@ func (s *Server) Start() error {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
 			return err
 		}
 		go s.handleConnection(conn)
 	}
+}
+
+func (s *Server) Close() error {
+	if s.listener != nil {
+		return s.listener.Close()
+	}
+	return nil
 }
 
 func (s *Server) handleConnection(conn net.Conn) {
@@ -339,28 +352,38 @@ func main() {
 
 	server := NewServer(cfg.Socket)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(ctx)
+
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	go func() {
-		<-sigCh
-		slog.Info("Shutting down")
-		os.Remove(cfg.Socket)
-		os.Exit(0)
-	}()
+	g.Go(func() error {
+		select {
+		case <-sigCh:
+			slog.Info("Shutting down")
+		case <-ctx.Done():
+		}
+		signal.Stop(sigCh)
+		cancel()
+		server.Close()
+		return nil
+	})
 
-	// Start web server if enabled
 	if cfg.Web != nil && cfg.Web.Enabled {
 		webServer := web.NewServer(cfg.Socket, cfg.Web.Address, cfg.Web.Ngrok)
-		go func() {
-			if err := webServer.Start(); err != nil {
-				slog.Error("Web server error", "error", err)
-			}
-		}()
+		g.Go(func() error {
+			return webServer.Start()
+		})
 	}
 
-	if err := server.Start(); err != nil {
+	g.Go(func() error {
+		return server.Start()
+	})
+
+	if err := g.Wait(); err != nil {
 		slog.Error("Server error", "error", err)
-		os.Exit(1)
 	}
+
+	os.Remove(cfg.Socket)
 }
