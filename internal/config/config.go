@@ -23,8 +23,11 @@ type WebConfig struct {
 }
 
 type NgrokConfig struct {
-	URL   string       `toml:"url"`
-	OAuth *OAuthConfig `toml:"oauth"`
+	Authtoken          string       `toml:"authtoken"`
+	URL                string       `toml:"url"`
+	ServerAddr         string       `toml:"server_addr"`
+	InsecureSkipVerify bool         `toml:"insecure_skip_verify"`
+	OAuth              *OAuthConfig `toml:"oauth"`
 }
 
 type OAuthConfig struct {

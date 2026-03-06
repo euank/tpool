@@ -2,12 +2,14 @@ package web
 
 import (
 	"context"
+	"crypto/tls"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -90,19 +92,44 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 func (s *Server) startWithNgrok(ctx context.Context) error {
-	opts := []ngrok.EndpointOption{}
+	agentOpts := []ngrok.AgentOption{}
+
+	authtoken := s.ngrokCfg.Authtoken
+	if authtoken == "" {
+		authtoken = os.Getenv("NGROK_AUTHTOKEN")
+	}
+	if authtoken != "" {
+		agentOpts = append(agentOpts, ngrok.WithAuthtoken(authtoken))
+	}
+
+	if s.ngrokCfg.ServerAddr != "" {
+		agentOpts = append(agentOpts, ngrok.WithAgentConnectURL(s.ngrokCfg.ServerAddr))
+	}
+
+	if s.ngrokCfg.InsecureSkipVerify {
+		agentOpts = append(agentOpts, ngrok.WithTLSConfig(func(c *tls.Config) {
+			c.InsecureSkipVerify = true
+		}))
+	}
+
+	agent, err := ngrok.NewAgent(agentOpts...)
+	if err != nil {
+		return fmt.Errorf("ngrok agent: %w", err)
+	}
+
+	endpointOpts := []ngrok.EndpointOption{}
 
 	if s.ngrokCfg.URL != "" {
-		opts = append(opts, ngrok.WithURL(s.ngrokCfg.URL))
+		endpointOpts = append(endpointOpts, ngrok.WithURL(s.ngrokCfg.URL))
 	}
 
 	if s.ngrokCfg.OAuth != nil {
 		policy := s.buildTrafficPolicy()
 		slog.Debug("constructed ngrok policy", "policy", policy)
-		opts = append(opts, ngrok.WithTrafficPolicy(policy))
+		endpointOpts = append(endpointOpts, ngrok.WithTrafficPolicy(policy))
 	}
 
-	listener, err := ngrok.Listen(ctx, opts...)
+	listener, err := agent.Listen(ctx, endpointOpts...)
 	if err != nil {
 		return fmt.Errorf("ngrok listen: %w", err)
 	}
